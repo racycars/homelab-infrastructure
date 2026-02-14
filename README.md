@@ -6,56 +6,58 @@ running on a live Ubuntu Server hosted on Hetzner.
 It is a sanitised version of my production homelab stack, with all sensitive
 information, domains, IP addresses, and secrets removed.
 
+The goal of this repository is to demonstrate infrastructure design,
+network segmentation, reverse proxy configuration, monitoring integration,
+and operational practices in a real-world deployment scenario.
+
 ---
 
-## 🌐 High-Level Architecture
+## 🌐 Architecture Overview
 
-Traffic Flow:
+### Traffic Flow
 
 Internet  
-→ Cloudflare DNS  
-→ Hetzner Ubuntu Server  
-→ Traefik Reverse Proxy (Let's Encrypt SSL)  
-→ Docker Containers  
+→ Cloudflare (DNS management)  
+→ Hetzner Dedicated Ubuntu Server  
+→ Traefik Reverse Proxy (Let's Encrypt SSL termination)  
+→ Docker Container Stacks  
 
-### Network Segmentation
+---
+
+## 🔐 Network & Security Design
 
 - Public-facing services are attached to a dedicated Traefik network.
-- Internal services remain isolated on default Docker networks.
-- Host-level access is restricted via UFW firewall rules.
+- Internal services remain isolated on default Docker stack networks.
+- Host-level access restricted via UFW firewall rules.
 - Only required ports are exposed.
+- SSL certificates managed automatically via Let's Encrypt.
+- Secrets managed via `.env` files (not included in this repository).
+
+This approach ensures service segmentation and minimises attack surface.
 
 ---
 
 ## 🐳 Stack Structure
 
-The infrastructure is split into modular stacks located in `/stacks/`.
+Infrastructure is modular and separated by concern under `/docker/stacks/`.
 
 Each stack contains:
-
 - `docker-compose.yml`
 - Stack-specific configuration
 - Environment variable references (redacted)
 
-### Example Stack Categories
+### Stack Categories Include:
 
 - Reverse Proxy (Traefik)
 - Authentication (Authentik)
 - Media Services
 - Monitoring & Observability (Prometheus, Loki, Promtail)
-- Backup (Autorestic)
-- Cloud Storage / File Services
+- Backup Automation (Autorestic)
 - Application Services (Nextcloud, Paperless, etc.)
+- Game Servers
+- Utility & Dashboard Services
 
----
-
-## 🔐 Security Approach
-
-- UFW firewall used to restrict host-level exposure.
-- Traefik handles SSL termination via Let's Encrypt.
-- Secrets managed via `.env` files (not included in this repo).
-- Services segmented by Docker network boundaries.
-- Public services isolated from internal-only services.
+Modularisation allows independent lifecycle management per stack.
 
 ---
 
@@ -63,61 +65,65 @@ Each stack contains:
 
 Integrated monitoring stack includes:
 
-- Prometheus (metrics)
+- Prometheus (metrics collection)
 - Loki (log aggregation)
-- Promtail / Fluent-bit (log shipping)
+- Promtail / Fluent-bit (log forwarding)
 
-This allows:
+This enables:
 
-- Container-level log monitoring
+- Container-level log visibility
 - System troubleshooting
 - Service reliability tracking
+- Operational debugging
 
 ---
 
 ## 💾 Backup Strategy
 
-Backups managed via Autorestic with scheduled execution.
+Backups are handled via Autorestic.
 
-- Service data stored on persistent volumes
-- Backup policies configured per stack
+- Persistent volumes defined per service
+- Scheduled backup execution
 - Off-host redundancy (sanitised details)
+
+Backup validation is part of operational maintenance.
 
 ---
 
 ## 🧠 Operational Practices
 
 - Regular patching and container updates
-- Log-based debugging (`journalctl`, container logs)
-- Modular stack management (`up-all.sh`, `down-all.sh`)
+- Log-based debugging using `journalctl` and container logs
+- Modular stack orchestration (`up-all.sh`, `down-all.sh`)
 - Post-change validation checklist
+- Separation of public and internal services
 
----
-
-## 🚀 Goals of This Environment
-
-- Maintain a production-style Linux server environment
-- Practice infrastructure security and network segmentation
-- Operate containerised services at scale
-- Implement monitoring and logging best practices
-- Simulate real-world multi-provider architecture
+This environment is actively maintained and used as a live production-style deployment.
 
 ---
 
 ## ⚠️ Important
 
-This repository is intended as a structural showcase only.
+This repository is intended as a structural and architectural showcase.
 
-It is not directly deployable without:
+It is **not directly deployable** without:
 
 - Creating your own `.env` files
 - Replacing placeholder domains
-- Configuring your own secrets
+- Supplying your own secrets
 - Reviewing exposed services
 
 ---
 
 ## 👤 About Me
 
-I am transitioning into a Junior Systems / Infrastructure / Cloud Support role and
-operate this environment as a practical learning and operational platform.
+I am transitioning into a Junior Systems / Infrastructure / Cloud Support role and operate this environment as a practical platform for infrastructure engineering and continuous learning.
+
+This stack reflects hands-on experience with:
+
+- Linux server administration
+- Docker-based service architecture
+- Reverse proxy and SSL management
+- Network segmentation
+- Monitoring and logging systems
+- Multi-provider infrastructure design
