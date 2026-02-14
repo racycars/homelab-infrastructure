@@ -1,0 +1,11 @@
+- Admin:
+    - Router:
+        - Traefik:
+            href: https://traefik.${DOMAIN}
+    - Auth:
+        - Authentik:
+            href: https://authentik.${DOMAIN}
+- Useful:
+    - GitHub:
+        - Repos:
+            href: https://example.com

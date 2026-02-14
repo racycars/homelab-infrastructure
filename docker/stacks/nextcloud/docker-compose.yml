@@ -1,0 +1,122 @@
+services:
+  nextcloud:
+    container_name: nextcloud
+    hostname: nextcloud.racycars.tech
+    image: nextcloud:latest
+    environment:
+      NEXTCLOUD_HOSTNAME: ${NEXTCLOUD_HOSTNAME}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+    volumes:
+    - /docker/appdata/nextcloud/web:/var/www/html
+    - /mnt/storage/NextCloud:/mnt
+    restart: unless-stopped
+    labels:
+    - traefik.enable=true
+    - traefik.docker.network=traefik
+    - traefik.http.routers.nextcloud.rule=Host(`example.com`)
+    - traefik.http.routers.nextcloud.entrypoints=websecure
+    - traefik.http.routers.nextcloud.tls.certresolver=letsencrypt
+    - traefik.http.routers.nextcloud.middlewares=chain-nextcloud@file,nextcloud-redirectregex2
+    - traefik.http.middlewares.nextcloud-redirectregex2.redirectregex.permanent=true
+    - traefik.http.middlewares.nextcloud-redirectregex2.redirectregex.regex=https?://([^/]*)(/.well-known[^#]*)
+    - traefik.http.middlewares.nextcloud-redirectregex2.redirectregex.replacement=https://$${1}/index.php$${2}
+    - homepage.group=Cloud
+    - homepage.name=Nextcloud
+    - homepage.icon=nextcloud
+    - homepage.href=https://example.com
+    env_file:
+    - .env
+    networks:
+    - default
+    - traefik
+  nextcloud-whiteboard-server:
+    image: example.com/nextcloud-releases/whiteboard:stable
+    container_name: nextcloud-whiteboard-server
+    environment:
+      NEXTCLOUD_URL: ${NEXTCLOUD_URL}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+    labels:
+    - traefik.http.services.whiteboard.loadbalancer.server.port=3002
+    - traefik.http.middlewares.strip-whiteboard.stripprefix.prefixes=/whiteboard
+    - traefik.http.routers.whiteboard.rule=Host(`example.com`) && PathPrefix(`/whiteboard`)
+    - traefik.http.routers.whiteboard.middlewares=strip-whiteboard
+    - homepage.group=Cloud
+    - homepage.name=Nextcloud Whiteboard Server
+    - homepage.icon=nextcloud-whiteboard-server
+    - homepage.href=https://example.com
+    env_file:
+    - .env
+    networks:
+    - default
+    - traefik
+  nextcloud-redis:
+    image: redis:alpine
+    container_name: nextcloud-redis
+    restart: always
+    command: redis-server
+    labels:
+    - homepage.exclude=true
+  nextcloud-postgresql:
+    image: postgres:17
+    container_name: nextcloud-db
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+    - 5432:5432
+    volumes:
+    - /docker/appdata/nextcloud/postgres:/var/lib/nextcloud-postgresql/18/docker
+    env_file:
+    - .env
+    labels:
+    - homepage.exclude=true
+  cron:
+    container_name: nextcloud-cron
+    image: nextcloud:latest
+    restart: always
+    volumes:
+    - /docker/appdata/nextcloud/web:/var/www/html
+    entrypoint: /cron.sh
+  appapi-harp:
+    image: example.com/nextcloud/nextcloud-appapi-harp:release
+    container_name: appapi-harp
+    hostname: appapi-harp
+    restart: unless-stopped
+    environment:
+      - HP_SHARED_KEY=${NC_HAPROXY_PASSWORD}
+      - NC_INSTANCE_URL=https://example.com
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /docker/appdata/nextcloud/harp-certs:/certs
+    networks:
+      - default
+      - traefik
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=traefik
+      - traefik.http.routers.exapps.rule=Host(`example.com`) && PathPrefix(`/exapps`)
+      - traefik.http.routers.exapps.entrypoints=websecure
+      - traefik.http.routers.exapps.tls.certresolver=letsencrypt
+      - traefik.http.routers.exapps.priority=100
+      - traefik.http.services.exapps.loadbalancer.server.port=8780
+   
+  nextcloud-appapi-dsp:
+    environment:
+      NC_HAPROXY_PASSWORD: ${NC_HAPROXY_PASSWORD}
+    volumes:
+    - /var/run/docker.sock:/var/run/docker.sock
+    container_name: nextcloud-appapi-dsp
+    hostname: nextcloud-appapi-dsp
+    restart: unless-stopped
+    privileged: true
+    image: example.com/nextcloud/nextcloud-appapi-dsp:release
+    env_file:
+    - .env
+networks:
+  default:
+    
+    internal: true
+  traefik:
+    external: true

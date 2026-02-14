@@ -1,0 +1,45 @@
+################################################################################
+# Autorestic configuration for the homelab
+#
+# Autorestic is a wrapper around Restic that makes it simple to define and
+# manage multiple backup locations.  This configuration defines a local
+# repository located under `/backups/homelab` by default.  You can change
+# the repository type and destination to suit your needs (for example to
+# back up to AWS S3, Google Cloud Storage, or another server via sftp).  See
+# https://example.com/configuration for the full reference.
+#
+# The `locations` section defines the directories you wish to back up.  Each
+# location references a `from` path on the host and a target repository
+# defined under `repositories`.  Add or remove locations to match the
+# persistent volumes used by your services (for example the `appdata`,
+# `nextcloud`, or `paperless` folders).  Environment variables from your
+# `.env` file can be used here – Autorestic will expand them when the
+# backup runs.
+################################################################################
+
+locations:
+  # Back up the Docker appdata directory where most container configs are stored
+  appdata:
+    from: /docker/appdata
+    to: local_repo
+  # Back up the global DOCKERDIR if defined.  Replace `${DOCKERDIR}`
+  # with the absolute path to your docker data directory if you don't
+  # use the DOCKERDIR environment variable.
+  dockerdir:
+    from: ${DOCKERDIR:-/srv/docker}
+    to: local_repo
+  # Back up Nextcloud data.  If you run Nextcloud, update this path to
+  # point at your data directory (usually inside `/docker/appdata/nextcloud`).
+  nextcloud:
+    from: /docker/appdata/nextcloud
+    to: local_repo
+  # Add additional backup locations here…
+
+repositories:
+  # A simple local repository that stores backups on disk.  You can
+  # replace this with an S3 bucket or any other restic backend.  Set
+  # `RESTIC_PASSWORD` in your `.env` file to protect your backups.
+  local_repo:
+    type: local
+    path: /backups/homelab
+    password: ${RESTIC_PASSWORD}

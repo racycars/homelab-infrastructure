@@ -1,0 +1,556 @@
+services:
+  
+  shelfmark:
+    image: example.com/calibrain/shelfmark:latest
+    container_name: shelfmark
+    restart: unless-stopped
+    environment:
+      PUID: ${PUID}
+      PGID: ${PGID}
+      TZ: ${TZ}
+    volumes:
+    - /docker/appdata/shelfmark/config:/config
+    - /mnt/storagebox/booklore/bookdrop:/books
+    - /mnt:/mnt
+    labels:
+    - traefik.enable=true
+    - traefik.docker.network=traefik
+    - traefik.http.routers.shelfmark.rule=Host(`shelfmark.${DOMAIN}`)
+    - traefik.http.routers.shelfmark.entrypoints=websecure
+    - traefik.http.routers.shelfmark.tls.certresolver=letsencrypt
+    - traefik.http.services.shelfmark.loadbalancer.server.port=8084
+    - traefik.http.routers.shelfmark.middlewares=chain-authentik@file
+    - homepage.group=Media
+    - homepage.name=Shelfmark
+    - homepage.icon=book
+    - homepage.href=https://shelfmark.${DOMAIN}
+    networks:
+    - default
+    - traefik
+  prowlarr:
+    image: example.com/linuxserver/prowlarr:latest
+    container_name: prowlarr
+    restart: unless-stopped
+    environment:
+      PUID: ${PUID}
+      PGID: ${PGID}
+      TZ: ${TZ}
+    volumes:
+    - /docker/appdata/prowlarr/config:/config
+    - /docker/appdata/prowlarr/custom-cont-init.d:/custom-cont-init.d
+    - /docker/appdata/prowlarr/custom-services.d:/custom-services.d
+    - /docker/scripts/bettarr:/scripts/bettarr
+    labels:
+    - traefik.enable=true
+    - traefik.docker.network=traefik
+    - traefik.http.routers.prowlarr.rule=Host(`prowlarr.${DOMAIN}`)
+    - traefik.http.routers.prowlarr.entrypoints=websecure
+    - traefik.http.routers.prowlarr.tls.certresolver=letsencrypt
+    - traefik.http.routers.prowlarr.middlewares=chain-authentik@file
+    - traefik.http.services.prowlarr.loadbalancer.server.port=9696
+    - homepage.group=Media
+    - homepage.name=Prowlarr
+    - homepage.icon=prowlarr
+    - homepage.href=https://prowlarr.${DOMAIN}
+    networks:
+    - default
+    - traefik
+  sonarr:
+    image: example.com/linuxserver/sonarr:latest
+    container_name: sonarr
+    restart: unless-stopped
+    environment:
+      PUID: ${PUID}
+      PGID: ${PGID}
+      TZ: ${TZ}
+    volumes:
+    - /docker/appdata/sonarr/config:/config
+    - /mnt:/mnt
+    labels:
+    - traefik.enable=true
+    - traefik.docker.network=traefik
+    - traefik.http.routers.sonarr.rule=Host(`sonarr.${DOMAIN}`)
+    - traefik.http.routers.sonarr.entrypoints=websecure
+    - traefik.http.routers.sonarr.tls.certresolver=letsencrypt
+    - traefik.http.routers.sonarr.middlewares=chain-authentik@file
+    - traefik.http.services.sonarr.loadbalancer.server.port=8989
+    - homepage.group=Media
+    - homepage.name=Sonarr
+    - homepage.icon=sonarr
+    - homepage.href=https://sonarr.${DOMAIN}
+    networks:
+    - default
+    - traefik
+  radarr:
+    image: example.com/linuxserver/radarr:latest
+    container_name: radarr
+    restart: unless-stopped
+    environment:
+      PUID: ${PUID}
+      PGID: ${PGID}
+      TZ: ${TZ}
+    volumes:
+    - /docker/appdata/radarr/config:/config
+    - /mnt:/mnt
+    labels:
+    - traefik.enable=true
+    - traefik.docker.network=traefik
+    - traefik.http.routers.radarr.rule=Host(`radarr.${DOMAIN}`)
+    - traefik.http.routers.radarr.entrypoints=websecure
+    - traefik.http.routers.radarr.tls.certresolver=letsencrypt
+    - traefik.http.routers.radarr.middlewares=chain-authentik@file
+    - traefik.http.services.radarr.loadbalancer.server.port=7878
+    - homepage.group=Media
+    - homepage.name=Radarr
+    - homepage.icon=radarr
+    - homepage.href=https://radarr.${DOMAIN}
+    networks:
+    - default
+    - traefik
+  lidarr:
+    image: example.com/hotio/lidarr:pr-plugins
+    container_name: lidarr
+    restart: unless-stopped
+    environment:
+      PUID: 0
+      PGID: 0
+      TZ: ${TZ}
+    volumes:
+    - /docker/appdata/lidarr-plugins/config:/config
+    - /mnt:/mnt
+    labels:
+    - traefik.enable=true
+    - traefik.docker.network=traefik
+    - traefik.http.routers.lidarr.rule=Host(`lidarr.${DOMAIN}`)
+    - traefik.http.routers.lidarr.entrypoints=websecure
+    - traefik.http.routers.lidarr.tls.certresolver=letsencrypt
+    - traefik.http.routers.lidarr.middlewares=chain-authentik@file
+    - traefik.http.services.lidarr.loadbalancer.server.port=8686
+    - homepage.group=Media
+    - homepage.name=Lidarr
+    - homepage.icon=lidarr
+    - homepage.href=https://lidarr.${DOMAIN}
+    networks:
+    - default
+    - traefik
+  doesthedogwatchplex:
+    container_name: dtdd
+    image: example.com/justkorix/doesthedogwatchplex:latest  # uncomment after publishing
+    environment:
+      - PLEX_URL=http://203.0.113.10:32400/
+      - PLEX_TOKEN=Nf-2JTp5Wsk5AHK6riev
+      - DTDD_API_KEY=e1ddf7847860b62772cb8cba6eeaa0eb
+      - PLEX_LIBRARIES=Movies              # comma-separated, or leave empty for all
+      - MIN_YES_VOTES=5
+      - MIN_YES_RATIO=0.7
+      - SHOW_SAFE_TOPICS=False
+      # Comma-separated list of topics to include (only these will show).
+      # Run: docker compose run --rm doesthedogwatchplex --list-topics to see all.
+      # Example: a dog dies,someone is sexually assaulted,someone dies by suicide
+  #    - INCLUDE_TOPICS=
+      # Comma-separated list of topics to exclude (ignored if INCLUDE_TOPICS is set).
+   #   - EXCLUDE_TOPICS=
+      # Translate warnings to another language (e.g., es, fr, de, pt, ja). Empty = English.
+   #   - LANGUAGE=
+      - DRY_RUN=False
+    #  - SCHEDULE=86400                      # run every 24h. Remove for one-shot.
+    volumes:
+      - dtdd-cache:/app/.cache              # persist API cache between runs
+    restart: unless-stopped
+    networks:
+          - traefik 
+
+
+  bazarr:
+    image: example.com/linuxserver/bazarr:latest
+    container_name: bazarr
+    restart: unless-stopped
+    environment:
+      PUID: ${PUID}
+      PGID: ${PGID}
+      TZ: ${TZ}
+    volumes:
+    - /docker/appdata/bazarr/config:/config
+    - /mnt:/mnt
+    labels:
+    - traefik.enable=true
+    - traefik.docker.network=traefik
+    - traefik.http.routers.bazarr.rule=Host(`bazarr.${DOMAIN}`)
+    - traefik.http.routers.bazarr.entrypoints=websecure
+    - traefik.http.routers.bazarr.tls.certresolver=letsencrypt
+    - traefik.http.routers.bazarr.middlewares=chain-authentik@file
+    - traefik.http.services.bazarr.loadbalancer.server.port=6767
+    - homepage.group=Media
+    - homepage.name=Bazarr
+    - homepage.icon=bazarr
+    - homepage.href=https://bazarr.${DOMAIN}
+    networks:
+    - default
+    - traefik
+  sabnzbd:
+    image: example.com/linuxserver/sabnzbd:latest
+    container_name: sabnzbd
+    restart: unless-stopped
+    environment:
+      PUID: ${PUID}
+      PGID: ${PGID}
+      TZ: ${TZ}
+    volumes:
+    - /docker/appdata/sabnzbd/config:/config
+    - /mnt:/mnt
+    labels:
+    - traefik.enable=true
+    - traefik.docker.network=traefik
+    - traefik.http.routers.sabnzbd.rule=Host(`sabnzbd.${DOMAIN}`)
+    - traefik.http.routers.sabnzbd.entrypoints=websecure
+    - traefik.http.routers.sabnzbd.tls.certresolver=letsencrypt
+    - traefik.http.routers.sabnzbd.middlewares=chain-authentik@file
+    - traefik.http.services.sabnzbd.loadbalancer.server.port=8080
+    - homepage.group=Media
+    - homepage.name=SABnzbd
+    - homepage.icon=sabnzbd
+    - homepage.href=https://sabnzbd.${DOMAIN}
+    networks:
+    - default
+    - traefik
+  seerr:
+    image: example.com/seerr-team/seerr:develop
+    container_name: seerr
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ}
+      PORT: 5055
+    volumes:
+    - /docker/appdata/seerr/config:/app/config
+    labels:
+    - traefik.enable=true
+    - traefik.docker.network=traefik
+    - traefik.http.routers.seerr.rule=Host(`seerr.${DOMAIN}`)
+    - traefik.http.routers.seerr.entrypoints=websecure
+    - traefik.http.routers.seerr.tls.certresolver=letsencrypt
+    - traefik.http.routers.seerr.middlewares=chain-authentik@file
+    - traefik.http.services.seerr.loadbalancer.server.port=5055
+    - homepage.group=Media
+    - homepage.name=Seerr
+    - homepage.icon=search
+    - homepage.href=https://seerr.${DOMAIN}
+    networks:
+    - default
+    - traefik
+  audiobookshelf:
+    image: example.com/advplyr/audiobookshelf:latest
+    container_name: audiobookshelf
+    restart: unless-stopped
+    environment:
+      PUID: ${PUID}
+      PGID: ${PGID}
+      TZ: ${TZ}
+    volumes:
+    - /docker/appdata/audiobookshelf/config:/config
+    - /docker/appdata/audiobookshelf/metadata:/metadata
+    - /mnt/storagebox/media/audiobooks:/audiobooks
+    - /mnt/storagebox/media/podcasts:/podcasts
+    labels:
+    - traefik.enable=true
+    - traefik.docker.network=traefik
+    - traefik.http.routers.audiobookshelf.rule=Host(`audiobookshelf.${DOMAIN}`)
+    - traefik.http.routers.audiobookshelf.entrypoints=websecure
+    - traefik.http.routers.audiobookshelf.tls.certresolver=letsencrypt
+    - traefik.http.services.audiobookshelf.loadbalancer.server.port=80
+    - homepage.group=Media
+    - homepage.name=Audiobookshelf
+    - homepage.icon=audiobookshelf
+    - homepage.href=https://audiobookshelf.${DOMAIN}
+    networks:
+    - default
+    - traefik
+  booklore:
+    image: example.com/booklore-app/booklore:latest
+    container_name: booklore
+    restart: unless-stopped
+    environment:
+      USER_ID: ${PUID}
+      GROUP_ID: ${PGID}
+      TZ: ${TZ}
+      DATABASE_URL: jdbc:mariadb://booklore-mariadb:3306/booklore
+      DATABASE_USERNAME: booklore
+      DATABASE_PASSWORD: Ilovegigi2021
+      BOOKLORE_PORT: 6060
+    depends_on:
+      booklore-mariadb:
+        condition: service_healthy
+    volumes:
+    - /docker/appdata/booklore/data:/app/data
+    - /docker/appdata/booklore/config:/config
+    - /mnt/storagebox/booklore/bookdrop:/bookdrop
+    - /mnt/storagebox:/mnt/storagebox
+    labels:
+    - traefik.enable=true
+    - traefik.docker.network=traefik
+    - traefik.http.routers.booklore.rule=Host(`booklore.${DOMAIN}`)
+    - traefik.http.routers.booklore.entrypoints=websecure
+    - traefik.http.routers.booklore.tls.certresolver=letsencrypt
+    - traefik.http.routers.booklore.middlewares=chain-authentik@file
+    - traefik.http.services.booklore.loadbalancer.server.port=6060
+    - homepage.group=Media
+    - homepage.name=BookLore
+    - homepage.icon=book-stack
+    - homepage.href=https://booklore.${DOMAIN}
+    networks:
+    - default
+    - traefik
+  booklore-mariadb:
+    image: example.com/linuxserver/mariadb:11.4.5
+    container_name: booklore-mariadb
+    restart: unless-stopped
+    environment:
+      PUID: ${PUID}
+      PGID: ${PGID}
+      TZ: ${TZ}
+      MYSQL_ROOT_PASSWORD: R@cycars21
+      MYSQL_DATABASE: booklore
+      MYSQL_USER: booklore
+      MYSQL_PASSWORD: Ilovegigi2021
+    volumes:
+    - /docker/appdata/booklore/mariadb:/config
+    healthcheck:
+      test:
+      - CMD
+      - mariadb-admin
+      - ping
+      - -h
+      - localhost
+      interval: 5s
+      timeout: 5s
+      retries: 10
+  
+  tautulli:
+    image: example.com/linuxserver/tautulli:latest
+    container_name: tautulli
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ}
+    volumes:
+    - /docker/appdata/tautulli/config:/config
+    labels:
+    - traefik.enable=true
+    - traefik.docker.network=traefik
+    - traefik.http.routers.tautulli.rule=Host(`tautulli.${DOMAIN}`)
+    - traefik.http.routers.tautulli.entrypoints=websecure
+    - traefik.http.routers.tautulli.tls.certresolver=letsencrypt
+    - traefik.http.routers.tautulli.middlewares=chain-authentik@file
+    - traefik.http.services.tautulli.loadbalancer.server.port=8181
+    - homepage.group=Media
+    - homepage.name=Tautulli
+    - homepage.icon=tautulli
+    - homepage.href=https://tautulli.${DOMAIN}
+    networks:
+    - default
+    - traefik
+  mylar3:
+    image: example.com/linuxserver/mylar3:nightly
+    container_name: mylar3
+    restart: unless-stopped
+    environment:
+      PUID: ${PUID}
+      PGID: ${PGID}
+      TZ: ${TZ}
+    volumes:
+    - ${DOCKERDIR}/mylar3:/config
+    - /mnt/storagebox/media/comics:/comics
+    - /mnt:/mnt
+    labels:
+    - traefik.enable=true
+    - traefik.docker.network=traefik
+    - traefik.http.routers.mylar3.rule=Host(`mylar.${DOMAIN}`)
+    - traefik.http.routers.mylar3.entrypoints=websecure
+    - traefik.http.routers.mylar3.tls.certresolver=letsencrypt
+    - traefik.http.routers.mylar3.middlewares=chain-authentik@file
+    - traefik.http.services.mylar3.loadbalancer.server.port=8090
+    - homepage.group=Media
+    - homepage.name=Mylar3
+    - homepage.icon=mylar3
+    - homepage.href=https://mylar.${DOMAIN}
+    networks:
+    - default
+    - traefik
+  tdarr:
+    image: example.com/haveagitgat/tdarr:latest
+    container_name: tdarr
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ}
+      PUID: ${PUID}
+      PGID: ${PGID}
+      UMASK_SET: '002'
+      serverIP: 203.0.113.10
+      serverPort: 8266
+      webUIPort: 8265
+      internalNode: 'true'
+      inContainer: 'true'
+      ffmpegVersion: '6'
+      nodeName: InternalNode
+    volumes:
+    - /docker/appdata/tdarr/server:/app/server
+    - /docker/appdata/tdarr/configs:/app/configs
+    - /docker/appdata/tdarr/logs:/app/logs
+    - /mnt/storagebox:/mnt/storagebox:rw
+    - /mnt/storage:/mnt/storage
+    - /docker/appdata/tdarr/transcode_cache:/temp
+    labels:
+    - traefik.enable=true
+    - traefik.docker.network=traefik
+    - traefik.http.routers.tdarr.rule=Host(`tdarr.${DOMAIN}`)
+    - traefik.http.routers.tdarr.entrypoints=websecure
+    - traefik.http.routers.tdarr.tls.certresolver=letsencrypt
+    - traefik.http.routers.tdarr.middlewares=chain-authentik@file
+    - traefik.http.services.tdarr.loadbalancer.server.port=8265
+    networks:
+    - default
+    - traefik
+  glances:
+    image: nicolargo/glances:latest
+    container_name: glances
+    restart: unless-stopped
+    pid: host
+    environment:
+      TZ: ${TZ}
+      GLANCES_OPT: -w
+    volumes:
+    - /var/run/docker.sock:/var/run/docker.sock:ro
+    - /run/user:/run/user:ro
+    labels:
+    - traefik.enable=true
+    - traefik.docker.network=traefik
+    - traefik.http.routers.glances.rule=Host(`glances.${DOMAIN}`)
+    - traefik.http.routers.glances.entrypoints=websecure
+    - traefik.http.routers.glances.tls.certresolver=letsencrypt
+    - traefik.http.routers.glances.middlewares=chain-authentik@file
+    - traefik.http.services.glances.loadbalancer.server.port=61208
+    networks:
+    - default
+    - traefik
+  theme-park:
+    image: example.com/themepark-dev/theme.park:latest
+    container_name: theme-park
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ}
+      PUID: ${PUID}
+      PGID: ${PGID}
+    volumes:
+    - /docker/appdata/themepark/data:/config
+    labels:
+    - traefik.enable=true
+    - traefik.docker.network=traefik
+    - traefik.http.routers.themepark.rule=Host(`theme.${DOMAIN}`)
+    - traefik.http.routers.themepark.entrypoints=websecure
+    - traefik.http.routers.themepark.tls.certresolver=letsencrypt
+    - traefik.http.routers.themepark.middlewares=chain-authentik@file
+    - traefik.http.services.themepark.loadbalancer.server.port=80
+    networks:
+    - default
+    - traefik
+  profilarr:
+    image: santiagosayshey/profilarr:latest
+    container_name: profilarr
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ}
+    volumes:
+    - /docker/appdata/profilarr/config:/config
+    labels:
+    - traefik.enable=true
+    - traefik.docker.network=traefik
+    - traefik.http.routers.profilarr.rule=Host(`profilarr.${DOMAIN}`)
+    - traefik.http.routers.profilarr.entrypoints=websecure
+    - traefik.http.routers.profilarr.tls.certresolver=letsencrypt
+    - traefik.http.routers.profilarr.middlewares=chain-authentik@file
+    - traefik.http.services.profilarr.loadbalancer.server.port=6868
+    networks:
+    - default
+    - traefik
+  
+  pwft:
+    image: netplexflix/pwft:latest
+    container_name: pwft
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ}
+      PUID: ${PUID}
+      PGID: ${PGID}
+    volumes:
+    - /docker/appdata/pwft/data:/data
+    labels:
+    - traefik.enable=true
+    - traefik.docker.network=traefik
+    - traefik.http.routers.pwft.rule=Host(`pwft.${DOMAIN}`)
+    - traefik.http.routers.pwft.entrypoints=websecure
+    - traefik.http.routers.pwft.tls.certresolver=letsencrypt
+    - traefik.http.routers.pwft.middlewares=chain-authentik@file
+    - traefik.http.services.pwft.loadbalancer.server.port=2025
+    networks:
+    - default
+    - traefik
+  kometa:
+    image: kometateam/kometa:latest
+    container_name: kometa
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ}
+      PMM_CONFIG: /config/config.yml
+      PMM_TIME: '21:00'
+      PMM_TEST: 'False'
+      PMM_NO_MISSING: 'False'
+    volumes:
+    - /docker/appdata/pmm/config:/config
+  
+  quickstart:
+    image: kometateam/quickstart:develop
+    container_name: kometa-quickstart
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ}
+    volumes:
+    - /docker/appdata/kometaquickstart/config:/config
+    labels:
+    - traefik.enable=true
+    - traefik.docker.network=traefik
+    - traefik.http.routers.kometa.rule=Host(`kometa.${DOMAIN}`)
+    - traefik.http.routers.kometa.entrypoints=websecure
+    - traefik.http.routers.kometa.tls.certresolver=letsencrypt
+    - traefik.http.routers.kometa.middlewares=chain-authentik@file
+    - traefik.http.services.kometa.loadbalancer.server.port=7171
+    networks:
+    - default
+    - traefik
+  flaresolverr:
+    image: example.com/flaresolverr/flaresolverr:latest
+    container_name: flaresolverr
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ}
+      LOG_LEVEL: info
+    labels:
+    - traefik.enable=true
+    - traefik.docker.network=traefik
+    - traefik.http.routers.flaresolverr.rule=Host(`flaresolverr.${DOMAIN}`)
+    - traefik.http.routers.flaresolverr.entrypoints=websecure
+    - traefik.http.routers.flaresolverr.tls.certresolver=letsencrypt
+    - traefik.http.routers.flaresolverr.middlewares=chain-authentik@file
+    - traefik.http.services.flaresolverr.loadbalancer.server.port=8191
+    - homepage.group=Media
+    - homepage.name=FlareSolverr
+    - homepage.icon=cloud
+    - homepage.href=https://flaresolverr.${DOMAIN}
+    networks:
+    - default
+    - traefik
+volumes:
+  dtdd-cache: 
+networks:
+  default:
+    
+    internal: true
+  traefik:
+    external: true

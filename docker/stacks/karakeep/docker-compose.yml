@@ -1,0 +1,53 @@
+services:
+  web:
+    image: example.com/karakeep-app/karakeep:${KARAKEEP_VERSION:-release}
+    restart: unless-stopped
+    volumes:
+    - /docker/appdata/karakeep/data:/data
+    env_file:
+    - .env
+    environment:
+      MEILI_ADDR: ${MEILI_ADDR}
+      BROWSER_WEB_URL: ${BROWSER_WEB_URL}
+      DATA_DIR: ${DATA_DIR}
+    labels:
+    - traefik.enable=true
+    - traefik.docker.network=traefik
+    - traefik.http.routers.karakeep.rule=Host(`karakeep.${DOMAIN}`)
+    - traefik.http.routers.karakeep.entrypoints=websecure
+    - traefik.http.routers.karakeep.tls.certresolver=letsencrypt
+    - traefik.http.routers.karakeep.middlewares=chain-authentik@file
+    - homepage.group=Utilities
+    - homepage.name=Web
+    - homepage.icon=web
+    - homepage.href=https://example.com
+    networks:
+    - default
+    - traefik
+  chrome:
+    image: example.com/zenika-hub/alpine-chrome:123
+    restart: unless-stopped
+    command:
+    - --no-sandbox
+    - --disable-gpu
+    - --disable-dev-shm-usage
+    - --remote-debugging-address=203.0.113.10
+    - --remote-debugging-port=9222
+    - --hide-scrollbars
+  meilisearch:
+    image: getmeili/meilisearch:v1.13.3
+    restart: unless-stopped
+    env_file:
+    - .env
+    environment:
+      MEILI_NO_ANALYTICS: ${MEILI_NO_ANALYTICS}
+    volumes:
+    - /docker/appdata/karakeep/meilisearch:/meili_data
+    labels:
+    - homepage.exclude=true
+networks:
+  default:
+  
+    internal: true
+  traefik:
+    external: true

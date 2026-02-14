@@ -1,0 +1,30 @@
+services:
+  homepage:
+    image: example.com/gethomepage/homepage:latest
+    container_name: homepage
+    restart: unless-stopped
+    volumes:
+    - ./config:/app/config:rw
+    - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      TZ: ${TZ}
+      HOMEPAGE_ALLOWED_HOSTS: example.com
+    labels:
+    - traefik.enable=true
+    - traefik.docker.network=traefik
+    - traefik.http.routers.homepage.rule=Host(`${DOMAIN}`)
+    - traefik.http.routers.homepage.entrypoints=websecure
+    - traefik.http.routers.homepage.tls.certresolver=letsencrypt
+    - traefik.http.routers.homepage.middlewares=middlewares-authentik@file
+    - traefik.http.services.homepage.loadbalancer.server.port=5000
+    env_file:
+    - .env
+    networks:
+    - default
+    - traefik
+networks:
+  default:
+    
+    internal: true
+  traefik:
+    external: true

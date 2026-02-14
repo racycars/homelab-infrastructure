@@ -1,0 +1,43 @@
+services:
+  your_spotify:
+    image: example.com/linuxserver/your_spotify:latest
+    container_name: your_spotify
+    environment:
+      TZ: ${TZ}
+      APP_URL: ${APP_URL}
+      SPOTIFY_PUBLIC: ${SPOTIFY_PUBLIC}
+      SPOTIFY_SECRET: ${SPOTIFY_SECRET}
+      CORS: ${CORS}
+      MONGO_ENDPOINT: ${MONGO_ENDPOINT}
+    restart: unless-stopped
+    labels:
+    - traefik.enable=true
+    - traefik.docker.network=traefik
+    - traefik.http.routers.yourspotify.rule=Host(`example.com`)
+    - traefik.http.routers.yourspotify.entrypoints=websecure
+    - traefik.http.routers.yourspotify.tls.certresolver=letsencrypt
+    - homepage.group=Media
+    - homepage.name=Your Spotify
+    - homepage.icon=your_spotify
+    - homepage.href=https://example.com
+    env_file:
+    - .env
+    networks:
+    - default
+    - traefik
+  mongo:
+    container_name: mongo-spot
+    restart: always
+    image: mongo:7
+    ports:
+    - 27017:27017
+    volumes:
+    - /docker/appdata/yourspotify/mongo/your_spotify_db:/data/db
+    labels:
+    - homepage.exclude=true
+networks:
+  default:
+    
+    internal: true
+  traefik:
+    external: true

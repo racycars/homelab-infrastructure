@@ -1,0 +1,32 @@
+version: '3.9'
+services:
+  ark_server:
+    image: hermsi/ark-server:latest
+    container_name: ark_server
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      PUID: ${PUID}
+      PGID: ${PGID}
+      TZ: ${TZ}
+      SESSION_NAME: ${SESSION_NAME}
+      SERVER_MAP: ${SERVER_MAP}
+      SERVER_PASSWORD: ${SERVER_PASSWORD}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      MAX_PLAYERS: ${MAX_PLAYERS}
+      UPDATE_ON_START: ${UPDATE_ON_START}
+      BACKUP_ON_STOP: ${BACKUP_ON_STOP}
+      PRE_UPDATE_BACKUP: ${PRE_UPDATE_BACKUP}
+      WARN_ON_STOP: ${WARN_ON_STOP}
+      MOD_IDS: ${MOD_IDS}
+      CLUSTER_ID: ${CLUSTER_ID}
+    volumes:
+    - /docker/appdata/ark:/app
+    - /docker/appdata/ark/backups:/home/steam/ARK-Backups
+    - /docker/appdata/ark/cluster:/home/steam/ark-cluster
+    
+networks:
+  default:
+    internal: true
+  traefik:
+    external: true

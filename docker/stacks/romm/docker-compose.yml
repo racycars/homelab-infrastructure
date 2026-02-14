@@ -1,0 +1,79 @@
+services:
+  romm:
+    image: rommapp/romm:latest
+    container_name: romm
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ}
+      DB_HOST: ${DB_HOST}
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWD: ${DB_PASSWD}
+      ROMM_AUTH_SECRET_KEY: ${ROMM_AUTH_SECRET_KEY}
+      IGDB_CLIENT_ID: ${IGDB_CLIENT_ID}
+      IGDB_CLIENT_SECRET: ${IGDB_CLIENT_SECRET}
+      MOBYGAMES_API_KEY: ${MOBYGAMES_API_KEY}
+      STEAMGRIDDB_API_KEY: ${STEAMGRIDDB_API_KEY}
+      SCREENSCRAPER_USER: ${SCREENSCRAPER_USER}
+      SCREENSCRAPER_PASSWORD: ${SCREENSCRAPER_PASSWORD}
+      LAUNCHBOX_API_ENABLED: ${LAUNCHBOX_API_ENABLED}
+      HASHEOUS_API_ENABLED: ${HASHEOUS_API_ENABLED}
+      PLAYMATCH_API_ENABLED: ${PLAYMATCH_API_ENABLED}
+    volumes:
+    - /docker/appdata/romm/resources:/romm/resources
+    - romm_redis:/redis-data
+    - /mnt/storagebox/media/roms:/romm/library
+    - /docker/appdata/romm/assets:/romm/assets
+    - /docker/appdata/romm/config:/romm/config
+    labels:
+    - traefik.enable=true
+    - traefik.docker.network=traefik
+    - traefik.http.routers.romm.rule=Host(`example.com`)
+    - traefik.http.routers.romm.entrypoints=websecure
+    - traefik.http.routers.romm.tls.certresolver=letsencrypt
+    - traefik.http.routers.romm.middlewares=middleware-cross-origin@file
+    - traefik.http.services.romm.loadbalancer.server.port=8080
+    - homepage.group=Games
+    - homepage.name=Romm
+    - homepage.icon=romm
+    - homepage.href=https://example.com
+    env_file:
+    - .env
+    networks:
+    - default
+    - traefik
+  romm-db:
+    image: mariadb:latest
+    container_name: romm-db
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD}
+      MARIADB_DATABASE: ${MARIADB_DATABASE}
+      MARIADB_USER: ${MARIADB_USER}
+      MARIADB_PASSWORD: ${MARIADB_PASSWORD}
+    volumes:
+    - /sys/fs/cgroup:/sys/fs/cgroup
+    - /docker/appdata/romm/mysql:/var/lib/mysql
+    healthcheck:
+      test:
+      - CMD
+      - healthcheck.sh
+      - --connect
+      - --innodb_initialized
+      start_period: 30s
+      start_interval: 10s
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    env_file:
+    - .env
+    labels:
+    - homepage.exclude=true
+volumes:
+  romm_redis: null
+networks:
+  default:
+  
+    internal: true
+  traefik:
+    external: true

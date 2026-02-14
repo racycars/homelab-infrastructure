@@ -1,0 +1,66 @@
+services:
+  mealie:
+    image: example.com/mealie-recipes/mealie:v3.3.1
+    container_name: mealie
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 1000M
+    volumes:
+    - /docker/appdata/mealie/mealie-data:/app/data/
+    environment:
+      ALLOW_SIGNUP: ${ALLOW_SIGNUP}
+      PUID: ${PUID}
+      PGID: ${PGID}
+      TZ: ${TZ}
+      BASE_URL: ${BASE_URL}
+      DB_ENGINE: ${DB_ENGINE}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_SERVER: ${POSTGRES_SERVER}
+      POSTGRES_PORT: ${POSTGRES_PORT}
+      POSTGRES_DB: ${POSTGRES_DB}
+    labels:
+    - traefik.enable=true
+    - traefik.docker.network=traefik
+    - traefik.http.routers.mealie.rule=Host(`example.com`)
+    - traefik.http.routers.mealie.entrypoints=websecure
+    - traefik.http.routers.mealie.tls.certresolver=letsencrypt
+    - homepage.group=Home
+    - homepage.name=Mealie
+    - homepage.icon=mealie
+    - homepage.href=https://example.com
+    env_file:
+    - .env
+    networks:
+    - default
+    - traefik
+  postgres:
+    container_name: postgresql-mealie
+    image: postgres:17
+    restart: always
+    volumes:
+    - /docker/appdata/mealie/mealie-pgdata:/var/lib/postgresql/data
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_USER: ${POSTGRES_USER}
+      PGUSER: ${PGUSER}
+      POSTGRES_DB: ${POSTGRES_DB}
+    healthcheck:
+      test:
+      - CMD
+      - pg_isready
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    env_file:
+    - .env
+    labels:
+    - homepage.exclude=true
+networks:
+  default:
+    
+    internal: true
+  traefik:
+    external: true

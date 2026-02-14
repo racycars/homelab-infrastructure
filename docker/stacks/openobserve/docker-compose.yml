@@ -1,0 +1,149 @@
+version: "3.9"
+
+services:
+  openobserve:
+    image: public.ecr.aws/zinclabs/openobserve:latest
+    container_name: openobserve
+    restart: unless-stopped
+    environment:
+      ZO_DATA_DIR: /data
+      ZO_ROOT_USER_EMAIL: ${ZO_ROOT_USER_EMAIL}
+      ZO_ROOT_USER_PASSWORD: ${ZO_ROOT_USER_PASSWORD}
+    volumes:
+      - /docker/appdata/openobserve/data:/data
+    networks:
+      - traefik
+      - default
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=traefik
+
+      - traefik.http.routers.openobserve.rule=Host(`observe.${DOMAIN}`)
+      - traefik.http.routers.openobserve.entrypoints=websecure
+      - traefik.http.routers.openobserve.tls.certresolver=letsencrypt
+      - traefik.http.routers.openobserve.middlewares=chain-authentik@file
+      - traefik.http.services.openobserve.loadbalancer.server.port=5080
+
+      - traefik.http.routers.openobserve-ingest.rule=Host(`ingest.${DOMAIN}`) && PathPrefix(`/api/`)
+      - traefik.http.routers.openobserve-ingest.entrypoints=websecure
+      - traefik.http.routers.openobserve-ingest.tls.certresolver=letsencrypt
+      - traefik.http.routers.openobserve-ingest.priority=200
+      - traefik.http.routers.openobserve-ingest.service=openobserve
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: openobserve_prometheus
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - /docker/appdata/prometheus:/prometheus
+    networks:
+      - default
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: openobserve_node_exporter
+    restart: unless-stopped
+    pid: host
+    command:
+      - --path.rootfs=/host
+      - --storage.tsdb.path=/prometheus
+      - --query.max-concurrency=20
+      - --query.active-query-tracker.dir=
+    volumes:
+      - /:/host:ro,rslave
+    networks:
+      - default
+
+  cadvisor:
+    image: example.com/cadvisor/cadvisor:latest
+    container_name: openobserve_cadvisor
+    restart: unless-stopped
+    privileged: true
+    devices:
+      - /dev/kmsg:/dev/kmsg
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    networks:
+      - default
+
+  fluent-bit:
+    image: example.com/fluent/fluent-bit:latest
+    container_name: openobserve_fluentbit
+    restart: unless-stopped
+    depends_on:
+      - openobserve
+    volumes:
+      - ./fluent-bit/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/log:/var/log:ro
+      - /etc/hostname:/etc/hostname:ro
+    networks:
+      - default
+
+  # ---- Added: Loki for logs (Grafana dashboards) ----
+  loki:
+    image: grafana/loki:latest
+    container_name: openobserve_loki
+    user: "0"
+    restart: unless-stopped
+    command: ["-config.file=/etc/loki/config.yml"]
+    volumes:
+      - ./loki/config.yml:/etc/loki/config.yml:ro
+      - /docker/appdata/loki:/loki
+    networks:
+      - default
+
+  # ---- Added: Promtail ships logs into Loki ----
+  promtail:
+    image: grafana/promtail:latest
+    container_name: openobserve_promtail
+    restart: unless-stopped
+    command: ["-config.file=/etc/promtail/config.yml"]
+    volumes:
+      - ./promtail/config.yml:/etc/promtail/config.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/log:/var/log:ro
+      - /etc/hostname:/etc/hostname:ro
+    networks:
+      - default
+
+  # ---- Added: Grafana dashboard UI ----
+  grafana:
+    image: grafana/grafana:latest
+    container_name: openobserve_grafana
+    restart: unless-stopped
+    user: "0"
+    environment:
+      - GF_SERVER_ROOT_URL=https://grafana.${DOMAIN}
+      - GF_USERS_DEFAULT_THEME=dark
+    volumes:
+      - /docker/appdata/grafana:/var/lib/grafana
+    networks:
+      - traefik
+      - default
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=traefik
+      - traefik.http.routers.grafana.rule=Host(`grafana.${DOMAIN}`)
+      - traefik.http.routers.grafana.entrypoints=websecure
+      - traefik.http.routers.grafana.tls.certresolver=letsencrypt
+      - traefik.http.routers.grafana.middlewares=chain-authentik@file
+      - traefik.http.services.grafana.loadbalancer.server.port=3000
+      - homepage.group=Infrastructure
+      - homepage.name=Grafana
+      - homepage.icon=grafana
+      - homepage.href=https://grafana.${DOMAIN}
+
+
+networks:
+  traefik:
+    external: true
+  
+  default:
+    driver: bridge

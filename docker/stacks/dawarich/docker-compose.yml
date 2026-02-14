@@ -1,0 +1,165 @@
+services:
+  dawarich_redis:
+    image: redis:7.4-alpine
+    container_name: dawarich_redis
+    command: redis-server
+    volumes:
+    - /docker/appdata/dawarich/redis:/data
+    restart: always
+    healthcheck:
+      test:
+      - CMD
+      - redis-cli
+      - --raw
+      - incr
+      - ping
+      interval: 10s
+      retries: 5
+      start_period: 30s
+      timeout: 10s
+    labels:
+    - homepage.exclude=true
+  dawarich_db:
+    image: postgis/postgis:17-3.5-alpine
+    shm_size: 1G
+    container_name: dawarich_db
+    volumes:
+    - /docker/appdata/dawarich/db:/var/lib/postgresql/data
+    - /docker/appdata/dawarich/shared:/var/shared
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    restart: always
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -U postgres -d dawarich_development
+      interval: 10s
+      retries: 5
+      start_period: 30s
+      timeout: 10s
+    env_file:
+    - .env
+    labels:
+    - homepage.exclude=true
+  dawarich_app:
+    image: freikin/dawarich:latest
+    container_name: dawarich_app
+    volumes:
+    - /docker/appdata/dawarich/public:/var/app/public
+    - /docker/appdata/dawarich/watched:/var/app/tmp/imports/watched
+    - /docker/appdata/dawarich/storage:/var/app/storage
+    - /docker/appdata/dawarich/db:/dawarich_db_data
+    stdin_open: true
+    tty: true
+    entrypoint: web-entrypoint.sh
+    command:
+    - bin/rails
+    - server
+    - -p
+    - '3000'
+    - -b
+    - '::'
+    restart: on-failure
+    environment:
+      RAILS_ENV: ${RAILS_ENV}
+      REDIS_URL: ${REDIS_URL}
+      DATABASE_HOST: ${DATABASE_HOST}
+      DATABASE_USERNAME: ${DATABASE_USERNAME}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD}
+      DATABASE_NAME: ${DATABASE_NAME}
+      MIN_MINUTES_SPENT_IN_CITY: ${MIN_MINUTES_SPENT_IN_CITY}
+      APPLICATION_HOSTS: ${APPLICATION_HOSTS}
+      TIME_ZONE: ${TIME_ZONE}
+      APPLICATION_PROTOCOL: ${APPLICATION_PROTOCOL}
+      PROMETHEUS_EXPORTER_ENABLED: ${PROMETHEUS_EXPORTER_ENABLED}
+      PROMETHEUS_EXPORTER_HOST: ${PROMETHEUS_EXPORTER_HOST}
+      PROMETHEUS_EXPORTER_PORT: ${PROMETHEUS_EXPORTER_PORT}
+      SELF_HOSTED: ${SELF_HOSTED}
+      STORE_GEODATA: ${STORE_GEODATA}
+    logging:
+      driver: json-file
+      options:
+        max-size: 100m
+        max-file: '5'
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - wget -qO - http://203.0.113.10:3000/api/v1/health | grep -q '"status"\s*:\s*"ok"'
+      interval: 10s
+      retries: 30
+      start_period: 30s
+      timeout: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 4G
+    labels:
+    - traefik.enable=true
+    - traefik.docker.network=traefik
+    - traefik.http.routers.dawarich.rule=Host(`example.com`)
+    - traefik.http.routers.dawarich.entrypoints=websecure
+    - traefik.http.routers.dawarich.tls=true
+    - traefik.http.routers.dawarich.tls.certresolver=letsencrypt
+    - traefik.http.services.dawarich.loadbalancer.server.port=3000
+    - traefik.http.routers.dawarich.middlewares=chain-authentik@file
+    - homepage.group=Utilities
+    - homepage.name=Dawarich App
+    - homepage.icon=dawarich_app
+    - homepage.href=https://example.com
+    env_file:
+    - .env
+    networks:
+    - default
+    - traefik
+  dawarich_sidekiq:
+    image: freikin/dawarich:latest
+    container_name: dawarich_sidekiq
+    volumes:
+    - /docker/appdata/dawarich/public:/var/app/public
+    - /docker/appdata/dawarich/watched:/var/app/tmp/imports/watched
+    - /docker/appdata/dawarich/storage:/var/app/storage
+    stdin_open: true
+    tty: true
+    entrypoint: sidekiq-entrypoint.sh
+    command:
+    - sidekiq
+    restart: on-failure
+    environment:
+      RAILS_ENV: ${RAILS_ENV}
+      REDIS_URL: ${REDIS_URL}
+      DATABASE_HOST: ${DATABASE_HOST}
+      DATABASE_USERNAME: ${DATABASE_USERNAME}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD}
+      DATABASE_NAME: ${DATABASE_NAME}
+      APPLICATION_HOSTS: ${APPLICATION_HOSTS}
+      BACKGROUND_PROCESSING_CONCURRENCY: ${BACKGROUND_PROCESSING_CONCURRENCY}
+      APPLICATION_PROTOCOL: ${APPLICATION_PROTOCOL}
+      PROMETHEUS_EXPORTER_ENABLED: ${PROMETHEUS_EXPORTER_ENABLED}
+      PROMETHEUS_EXPORTER_HOST: ${PROMETHEUS_EXPORTER_HOST}
+      PROMETHEUS_EXPORTER_PORT: ${PROMETHEUS_EXPORTER_PORT}
+      SELF_HOSTED: ${SELF_HOSTED}
+      STORE_GEODATA: ${STORE_GEODATA}
+    logging:
+      driver: json-file
+      options:
+        max-size: 100m
+        max-file: '5'
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pgrep -f sidekiq
+      interval: 10s
+      retries: 30
+      start_period: 30s
+      timeout: 10s
+    env_file:
+    - .env
+networks:
+  default:
+    
+    internal: true
+  traefik:
+    external: true

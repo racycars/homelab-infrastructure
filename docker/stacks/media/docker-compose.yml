@@ -1,0 +1,138 @@
+name: media
+services:
+  podgrab:
+    image: akhilrex/podgrab
+    container_name: podgrab
+    environment:
+      CHECK_FREQUENCY: ${CHECK_FREQUENCY}
+    volumes:
+    - /docker/appdata/podgrab/config:/config
+    - /mnt/storagebox/media/podcasts:/assets
+    restart: unless-stopped
+    labels:
+    - traefik.enable=true
+    - traefik.docker.network=traefik
+    - traefik.http.routers.podgrab.rule=Host(`podgrab.${DOMAIN}`)
+    - traefik.http.routers.podgrab.entrypoints=websecure
+    - traefik.http.routers.podgrab.tls.certresolver=letsencrypt
+    - traefik.http.routers.podgrab.middlewares=chain-authentik@file
+    - homepage.group=Media
+    - homepage.name=Podgrab
+    - homepage.icon=podgrab
+    - homepage.href=https://example.com
+    env_file:
+    - .env
+    networks:
+    - default
+    - traefik
+  samsung-tvplus:
+    container_name: samsung-tvplus
+    environment:
+      - REGIONS=gb|us
+      - TZ=Pacific/Auckland
+    image: matthuisman/samsung-tvplus-for-channels
+    ports:
+      - 8182:80
+    restart: unless-stopped
+    networks:
+    - default
+    - traefik
+    labels:
+    - traefik.enable=true
+    - traefik.docker.network=traefik
+    - traefik.http.routers.stv.rule=Host(`samsungtv.${DOMAIN}`)
+    - traefik.http.routers.stv.entrypoints=websecure
+    - traefik.http.routers.stv.tls.certresolver=letsencrypt
+    
+  dispatcharr:
+    image: example.com/dispatcharr/dispatcharr:latest
+    container_name: dispatcharr
+    restart: unless-stopped
+    ports:
+        - 9191:9191
+    # VA-API hardware acceleration (Intel / AMD)
+    devices:
+      - /dev/dri:/dev/dri
+
+    volumes:
+      - /docker/appdata/dispatcharr:/data
+
+    environment:
+      - DISPATCHARR_ENV=aio
+      - DISPATCHARR_LOG_LEVEL=info
+
+      # VA-API / FFmpeg
+      - LIBVA_DRIVER_NAME=iHD        # Intel Gen9+ (use "i965" for older Intel)
+      - LIBVA_DRIVERS_PATH=/usr/lib/x86_64-linux-gnu/dri
+
+      # Redis
+      - REDIS_HOST=dispatcharr_redis
+      - CELERY_BROKER_URL=redis://dispatcharr_redis:6379/0
+
+    depends_on:
+      - dispatcharr_redis
+
+    networks:
+    - default
+    - traefik
+ 
+
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=traefik
+
+      # Router
+      - traefik.http.routers.dispatcharr.rule=Host(`example.com`)
+      - traefik.http.routers.dispatcharr.entrypoints=websecure
+      - traefik.http.routers.dispatcharr.tls=true
+      - traefik.http.routers.dispatcharr.tls.certresolver=letsencrypt
+
+      # Backend service port (confirmed from logs)
+      - traefik.http.services.dispatcharr.loadbalancer.server.port=9191
+
+  iSponsorBlockTV:
+        image: example.com/dmunozv04/isponsorblocktv
+        container_name: iSponsorBlockTV
+        restart: unless-stopped
+        network_mode: host
+        volumes:
+        - /docker/appdata/isponsorblocktv/data:/app/data #enter the same pathway as you used for your configurator in step 1
+  dispatcharr_redis:
+    image: redis:7-alpine
+    container_name: dispatcharr_redis
+    restart: unless-stopped
+
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - /docker/appdata/dispatcharr/redis:/data
+
+    
+  jellyfin:
+    image: example.com/jellyfin/jellyfin
+    container_name: jellyfin
+    environment:
+      PUID: ${PUID}
+      PGID: ${PGID}
+      TZ: ${TZ}
+      JELLYFIN_PublishedServerUrl: ${JELLYFIN_PublishedServerUrl}
+    network_mode: host
+    volumes:
+        - /docker/appdata/jellyfin/config:/config
+        - /docker/appdata/jellyfin/cache:/cache
+        - /mnt/storagebox:/mnt/storagebox
+        - /dev/dri:/dev/dri
+    devices:
+        - /dev/dri:/dev/dri
+    group_add:
+        
+        - "video"
+    restart: unless-stopped
+    env_file:
+    - .env
+    
+networks:
+  default:
+    
+    internal: true
+  traefik:
+    external: true

@@ -1,0 +1,68 @@
+services:
+  vaultwarden:
+    image: vaultwarden/server:latest-alpine
+    volumes:
+    - /docker/appdata/vaultwarden/Data/Vaultwarden:/data
+    restart: unless-stopped
+    environment:
+      WEBSOCKET_ENABLED: ${WEBSOCKET_ENABLED}
+      SIGNUPS_ALLOWED: ${SIGNUPS_ALLOWED}
+      SIGNUPS_VERIFY: ${SIGNUPS_VERIFY}
+      INVITATIONS_ALLOWED: ${INVITATIONS_ALLOWED}
+      SHOW_PASSWORD_HINT: ${SHOW_PASSWORD_HINT}
+      ADMIN_TOKEN: ${ADMIN_TOKEN}
+      DISABLE_ADMIN_TOKEN: ${DISABLE_ADMIN_TOKEN}
+      LOG_FILE: ${LOG_FILE}
+      LOG_LEVEL: ${LOG_LEVEL}
+    env_file:
+    - .env
+  nginx:
+    build: /docker/appdata/vaultwarden/Docker/nginx
+    links:
+    - vaultwarden
+    - vw_backup
+    environment:
+      VIRTUAL_HOST: $VIRTUAL_HOST
+    command: /bin/sh -c "/run_nginx.sh"
+    restart: on-failure
+    labels:
+    - traefik.enable=true
+    - traefik.docker.network=traefik
+    - traefik.http.routers.${PROJECT_IDENTIFIER}.tls=true
+    - traefik.http.routers.${PROJECT_IDENTIFIER}.entrypoints=websecure
+    - traefik.http.routers.${PROJECT_IDENTIFIER}.rule=Host(`${VIRTUAL_HOST}`)
+    - traefik.http.routers.${PROJECT_IDENTIFIER}.service=${PROJECT_IDENTIFIER}
+    - traefik.http.services.${PROJECT_IDENTIFIER}.loadbalancer.server.port=80
+    - homepage.group=Security
+    - homepage.name=Nginx
+    - homepage.icon=nginx
+    - homepage.href=https://${VIRTUAL_HOST}
+    env_file:
+    - .env
+    networks:
+    - default
+    - traefik
+  vw_backup:
+    image: bruceforce/bw_backup:latest
+    restart: on-failure
+    volumes:
+    - /docker/appdata/vaultwarden/Data/Vaultwarden:/data
+    - /docker/appdata/vaultwarden/Data/Vaultwarden-Backup:/backup
+    - /etc/timezone:/etc/timezone:ro
+    - /etc/localtime:/etc/localtime:ro
+    environment:
+      DB_FILE: ${DB_FILE}
+      BACKUP_FILE: ${BACKUP_FILE}
+      BACKUP_FILE_PERMISSIONS: ${BACKUP_FILE_PERMISSIONS}
+      CRON_TIME: ${CRON_TIME}
+      TIMESTAMP: ${TIMESTAMP}
+      UID: ${UID}
+      GID: ${GID}
+    env_file:
+    - .env
+networks:
+  default:
+   
+    internal: true
+  traefik:
+    external: true

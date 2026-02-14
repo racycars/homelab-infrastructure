@@ -1,0 +1,151 @@
+services:
+  postgresql:
+    container_name: authentik_postgres
+    image: example.com/library/postgres:16-alpine
+    restart: unless-stopped
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}
+      start_period: 20s
+      interval: 30s
+      retries: 5
+      timeout: 5s
+    volumes:
+    - $DOCKERDIR/authentik/postgresql/data:/var/lib/postgresql/data
+    environment:
+    - POSTGRES_DB
+    - POSTGRES_USER
+    - POSTGRES_PASSWORD
+    secrets:
+    - authentik_postgresql_db
+    - authentik_postgresql_user
+    - authentik_postgresql_password
+    env_file:
+    - .env
+    labels:
+    - homepage.exclude=true
+  authentik-redis:
+    image: example.com/library/redis:alpine
+    container_name: authentik_redis
+    command: --save 60 1 --loglevel warning
+    restart: unless-stopped
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - authentik-redis-cli ping | grep PONG
+      start_period: 20s
+      interval: 30s
+      retries: 5
+      timeout: 3s
+    volumes:
+    - $DOCKERDIR/authentik/authentik-redis/data:/data
+    labels:
+    - homepage.exclude=true
+  server:
+    image: example.com/goauthentik/server:2025.10.3
+    container_name: authentik_server
+    restart: unless-stopped
+    command: server
+    ports:
+    - 9000:9000
+    user: root
+    volumes:
+    - $DOCKERDIR/authentik/media:/media
+    - $DOCKERDIR/authentik/custom-templates:/templates
+    - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+    - AUTHENTIK_REDIS__HOST
+    - AUTHENTIK_POSTGRESQL__HOST
+    - AUTHENTIK_POSTGRESQL__NAME
+    - AUTHENTIK_POSTGRESQL__USER
+    - AUTHENTIK_POSTGRESQL__PASSWORD
+    - AUTHENTIK_EMAIL__PASSWORD
+    - AUTHENTIK_ERROR_REPORTING__ENABLED
+    - AUTHENTIK_SECRET_KEY
+    - AUTHENTIK_COOKIE_DOMAIN
+    - WORKERS
+    secrets:
+    - authentik_postgresql_db
+    - authentik_postgresql_user
+    - authentik_postgresql_password
+    - authelia_notifier_smtp_password
+    - authentik_secret_key
+    env_file:
+    - .env
+    labels:
+    - traefik.enable=true
+    - traefik.docker.network=traefik
+    - traefik.http.routers.authentik-rtr.rule=Host(`example.com`)
+    - traefik.http.routers.authentik-rtr.entrypoints=websecure
+    - traefik.http.routers.authentik-rtr.tls=true
+    - traefik.http.routers.authentik-rtr.tls.certresolver=letsencrypt
+    - traefik.http.routers.authentik-rtr-outpost.rule=HostRegexp(`{subdomain:[a-z0-9-]+}.$DOMAIN`)&&
+      PathPrefix(`/example.com/`)
+    - traefik.http.routers.authentik-rtr-outpost.entrypoints=websecure
+    - traefik.http.routers.authentik-rtr-outpost.tls=true
+    - traefik.http.routers.authentik-rtr-outpost.tls.certresolver=letsencrypt
+    - traefik.http.routers.authentik-rtr.service=authentik-svc
+    - traefik.http.services.authentik-svc.loadBalancer.server.port=9000
+    - homepage.group=Network
+    - homepage.name=Authentik
+    - homepage.icon=authentik.png
+    - homepage.href=https://example.com
+    - homepage.description=SSO Authentication
+    - homepage.widget.type=authentik
+    - homepage.widget.url=https://example.com
+    - homepage.widget.key=v2BqycacJ9nVzNsvVWlJuOP26kPwnygUp3q2P2mcbPVeLUMHafrpzyYMyTEF
+    - homepage.widget.version=2
+  worker:
+    ulimits:
+      nofile:
+        soft: 10240
+        hard: 10240
+    image: example.com/goauthentik/server:2025.10.3
+   
+    restart: unless-stopped
+    command: worker
+    deploy:
+      resources:
+        reservations:
+          memory: 3048M
+    volumes:
+    - $DOCKERDIR/authentik/media:/media
+    - $DOCKERDIR/authentik/custom-templates:/templates
+    - $DOCKERDIR/authentik/geoip/data:/geoip
+    - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+    - AUTHENTIK_REDIS__HOST
+    - AUTHENTIK_POSTGRESQL__HOST
+    - AUTHENTIK_POSTGRESQL__NAME
+    - AUTHENTIK_POSTGRESQL__USER
+    - AUTHENTIK_POSTGRESQL__PASSWORD
+    - AUTHENTIK_EMAIL__PASSWORD
+    - AUTHENTIK_ERROR_REPORTING__ENABLED
+    - AUTHENTIK_SECRET_KEY
+    - AUTHENTIK_COOKIE_DOMAIN
+    - WORKERS
+    secrets:
+    - authentik_postgresql_db
+    - authentik_postgresql_user
+    - authentik_postgresql_password
+    - authelia_notifier_smtp_password
+    - authentik_secret_key
+    user: root
+    env_file:
+    - .env
+secrets:
+  authentik_postgresql_db:
+    file: $DOCKERDIR/authentik/secrets/authentik_postgresql_db
+  authentik_postgresql_user:
+    file: $DOCKERDIR/authentik/secrets/authentik_postgresql_user
+  authentik_postgresql_password:
+    file: $DOCKERDIR/authentik/secrets/authentik_postgresql_password
+  authentik_secret_key:
+    file: $DOCKERDIR/authentik/secrets/authentik_secret_key
+  authelia_notifier_smtp_password:
+    file: $DOCKERDIR/authentik/secrets/authelia_notifier_smtp_password
+networks:
+  default:
+    name: traefik
+    external: true

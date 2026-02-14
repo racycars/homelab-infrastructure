@@ -1,0 +1,18 @@
+include:
+  - stacks/ark/docker-compose.yml 
+  - stacks/arrs/docker-compose.yml
+  - stacks/authentik/docker-compose.yml
+  - stacks/dawarich/docker-compose.yml
+  - stacks/homepage/compose.yaml
+  - stacks/immich/docker-compose.yml
+  - stacks/karakeep/docker-compose.yml
+  - stacks/mealie/docker-compose.yml
+  - stacks/media/docker-compose.yml
+  - stacks/minecraft/docker-compose.yml
+  - stacks/nextcloud/docker-compose.yml
+  - stacks/paperless/docker-compose.yml
+  - stacks/romm/docker-compose.yml
+  - stacks/traefik/docker-compose.yml
+  - stacks/vaultwarden/docker-compose.yml
+  - stacks/yourspotify/docker-compose.yml
+  - stacks/uptime/docker-compose.yml 

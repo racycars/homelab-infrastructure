@@ -1,0 +1,629 @@
+name: traefik
+services:
+  traefik:
+    image: traefik:latest
+    container_name: traefik
+    restart: unless-stopped
+    command:
+    - --providers.docker=true
+    - --api=true
+    - --api.dashboard=true
+    - --providers.file.directory=/etc/traefik
+    - --providers.file.watch=true
+    - --log.level=error
+    - --providers.docker.exposedbydefault=false
+    - --accessLog=true
+    - --accessLog.filePath=/logs/access.log
+    - --accessLog.bufferingSize=100
+    - --accessLog.format=json
+    - --accessLog.filters.statusCodes=204-299,400-499,500-599
+    - --metrics.prometheus=true
+    - --metrics.prometheus.addentrypointslabels=true
+    - --metrics.prometheus.addrouterslabels=true
+    - --metrics.prometheus.addServicesLabels=true
+    - --entryPoints.metrics.address=:8055
+    - --metrics.prometheus.entryPoint=metrics
+    - --entryPoints.websecure.transport.respondingTimeouts.readTimeout=600s
+    - --entryPoints.websecure.transport.respondingTimeouts.writeTimeout=600s
+    - --entryPoints.websecure.transport.respondingTimeouts.idleTimeout=600s
+    - --certificatesresolvers.letsencrypt.acme.dnschallenge=true
+    - --certificatesresolvers.letsencrypt.acme.dnschallenge.provider=cloudflare
+    - --certificatesresolvers.letsencrypt.acme.email=you@example.com
+    - --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json
+    - --entrypoints.web.address=:80
+    - --entrypoints.web.http.redirections.entrypoint.to=websecure
+    - --entrypoints.web.http.redirections.entrypoint.scheme=https
+    - --entrypoints.websecure.address=:443
+    - --entrypoints.websecure.http.tls=true
+    - --entrypoints.websecure.http.tls.certResolver=letsencrypt
+    - --experimental.plugins.themepark.modulename=example.com/packruler/traefik-themepark
+    - --experimental.plugins.themepark.version=v1.4.2
+    - --entrypoints.websecure.http.tls.domains[0].main=${DOMAIN}
+    - --entrypoints.websecure.http.tls.domains[0].sans=*.${DOMAIN}
+    - --entrypoints.websecure.http.tls.domains[1].main=example.com
+    - --entrypoints.websecure.http.tls.domains[1].sans=*.example.com
+    ports:
+        - 80:80
+        - 443:443
+        
+    environment:
+      CLOUDFLARE_EMAIL: ${CLOUDFLARE_EMAIL}
+      CLOUDFLARE_DNS_API_TOKEN: ${CLOUDFLARE_DNS_API_TOKEN}
+      TRAEFIK_ENABLE_IPV6: ${TRAEFIK_ENABLE_IPV6}
+    env_file:
+    - .env
+    volumes:
+    - /var/run/docker.sock:/var/run/docker.sock:ro
+    - /docker/appdata/traefik/certs:/letsencrypt
+    - /docker/appdata/traefik:/etc/traefik
+    - /docker/logs/web/traefik:/logs
+    labels:
+    - traefik.enable=true
+    - traefik.docker.network=traefik
+    - traefik.http.routers.traefik.rule=Host(`traefik.${DOMAIN}`)
+    - traefik.http.routers.traefik.tls.certresolver=letsencrypt
+    - traefik.http.routers.traefik.service=api@internal
+    - traefik.http.routers.traefik.middlewares=strip
+    - traefik.http.middlewares.strip.stripprefix.prefixes=/traefik
+    - traefik.http.routers.traefik.middlewares=chain-authentik@file
+    - homepage.group=Infrastructure
+    - homepage.name=Traefik
+    - homepage.icon=traefik
+    - homepage.href=https://example.com
+    - homepage.widget.type=traefik
+    - homepage.widget.url=http://traefik:8080
+    networks:
+    - default
+    - traefik
+  arcane:
+    image: example.com/getarcaneapp/arcane:latest
+    container_name: arcane
+    restart: unless-stopped
+    environment:
+      PUID: 1000
+      PGID: 1000
+      TZ: ${TZ:-Pacific/Auckland}
+      APP_URL: https://example.com
+      LOG_LEVEL: info
+      LOG_JSON: 'false'
+      ENCRYPTION_KEY: 0cd576c239facc4e1f9620d01c14255d3b9fa3870838ba1852bab2628e194200
+      JWT_SECRET: a572afac2befd59eb9c68f9ec280b517fcc113b92ff99f0b1e68e2124ff7abbc
+      POSTGRES_DB: arcane
+      POSTGRES_USER: arcane
+      POSTGRES_PASSWORD: Racycars21
+      DATABASE_URL: postgresql://arcane:Racycars21@arcane-postgres:5432/arcane
+      OIDC_ENABLED: 'true'
+      OIDC_CLIENT_ID: J6cLkJSEDM4pRyo1nSxmHkbYChO17ceVUXAHqm7w
+      OIDC_CLIENT_SECRET: Q2CxsUNqyXtQfYwziP2oyJrrVfUjMc75FVoOUZfbjAk2J9x0pvV0mYtL4CvQ3TeTDki2E9VbAS4snJHFN0RnxNfvwLZdLmI8y3C8iwtnocA2swOvm4J42ICOkdx3JrZ6
+      OIDC_ISSUER_URL: https://example.com/application/o/arcane/
+      OIDC_SCOPES: openid email profile
+      OIDC_ADMIN_CLAIM: groups
+      OIDC_ADMIN_VALUE: authentik-admins
+    volumes:
+    - /var/run/docker.sock:/var/run/docker.sock:ro
+    - /docker/appdata/arcane/data:/app/data
+    - /home/daniel/docker/stacks:/app/data/projects
+    depends_on:
+    - arcane-postgres
+    labels:
+    - traefik.enable=true
+    - traefik.docker.network=traefik
+    - traefik.http.routers.arcane.rule=Host(`arcane.${DOMAIN}`)
+    - traefik.http.routers.arcane.entrypoints=websecure
+    - traefik.http.routers.arcane.tls.certresolver=letsencrypt
+    - traefik.http.services.arcane.loadbalancer.server.port=3552
+    networks:
+    - default
+    - traefik
+  arcane-postgres:
+    image: postgres:17-alpine
+    container_name: arcane-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: arcane
+      POSTGRES_USER: arcane
+      POSTGRES_PASSWORD: Racycars21
+    volumes:
+    - /docker/appdata/arcane/db:/var/lib/postgresql/data
+  hbbr:
+    image: rustdesk/rustdesk-server:latest
+    container_name: hbbr
+    restart: unless-stopped
+    command: hbbr
+    network_mode: host
+    environment:
+      PUID: ${PUID}
+      PGID: ${PGID}
+      TZ: ${TZ}
+    volumes:
+    - /docker/appdata/rustdesk/data:/root
+    
+  hbbs:
+    image: rustdesk/rustdesk-server:latest
+    container_name: hbbs
+    restart: unless-stopped
+    command: hbbs
+    network_mode: host
+    environment:
+      PUID: ${PUID}
+      PGID: ${PGID}
+      TZ: ${TZ}
+    volumes:
+    - /docker/appdata/rustdesk/data:/root
+    depends_on:
+    - hbbr
+    
+  termix:
+    image: example.com/lukegus/termix:latest
+    container_name: termix
+    restart: unless-stopped
+    volumes:
+    - /docker/appdata/termix-data:/app/data
+    environment:
+      PORT: 8080
+    labels:
+    - traefik.enable=true
+    - traefik.docker.network=traefik
+    - traefik.http.routers.termix.rule=Host(`termix.${DOMAIN}`)
+    - traefik.http.routers.termix.entrypoints=websecure
+    - traefik.http.routers.termix.tls.certresolver=letsencrypt
+    - traefik.http.services.termix.loadbalancer.server.port=8080
+    - traefik.http.routers.termix.middlewares=chain-authentik@file
+    - homepage.group=Infrastructure
+    - homepage.name=Termix
+    - homepage.icon=terminal
+    - homepage.href=https://example.com
+    networks:
+    - default
+    - traefik
+  it-tools:
+    image: corentinth/it-tools:latest
+    restart: unless-stopped
+    container_name: it-tools
+    labels:
+    - traefik.enable=true
+    - traefik.docker.network=traefik
+    - traefik.http.routers.tools.rule=Host(`ittools.${DOMAIN}`)
+    - traefik.http.routers.tools.entrypoints=websecure
+    - traefik.http.routers.tools.tls.certresolver=letsencrypt
+    - homepage.group=Infrastructure
+    - homepage.name=It Tools
+    - homepage.icon=it-tools
+    - homepage.href=https://example.com
+    networks:
+    - default
+    - traefik
+  omni-tools:
+    image: iib0011/omni-tools:latest
+    container_name: omni-tools
+    restart: unless-stopped
+    labels:
+    - traefik.enable=true
+    - traefik.docker.network=traefik
+    - traefik.http.routers.omni.rule=Host(`example.com`)
+    - traefik.http.routers.omni.entrypoints=websecure
+    - traefik.http.routers.omni.tls.certresolver=letsencrypt
+    - homepage.group=Infrastructure
+    - homepage.name=Omni Tools
+    - homepage.icon=omni-tools
+    - homepage.href=https://example.com
+    networks:
+    - default
+    - traefik
+  stirling-pdf:
+    image: frooodle/s-pdf:latest
+    container_name: stirling-pdf
+    restart: unless-stopped
+    volumes:
+    - /docker/appdata/stirling-pdf/trainingData:/usr/share/tessdata
+    - /docker/appdata/stirling-pdf/extraConfigs:/configs
+    - /docker/appdata/stirling-pdf/customFiles:/customFiles
+    environment:
+      DOCKER_ENABLE_SECURITY: ${DOCKER_ENABLE_SECURITY}
+      INSTALL_BOOK_AND_ADVANCED_HTML_OPS: ${INSTALL_BOOK_AND_ADVANCED_HTML_OPS}
+      LANGS: eng
+    labels:
+    - traefik.enable=true
+    - traefik.docker.network=traefik
+    - traefik.http.routers.stirling-pdf.rule=Host(`example.com`)
+    - traefik.http.routers.stirling-pdf.entrypoints=websecure
+    - traefik.http.routers.stirling-pdf.tls.certresolver=letsencrypt
+    - traefik.http.services.stirling-pdf.loadbalancer.server.port=8080
+    - homepage.group=Infrastructure
+    - homepage.name=Stirling Pdf
+    - homepage.icon=stirling-pdf
+    - homepage.href=https://example.com
+    env_file:
+    - .env
+    networks:
+    - default
+    - traefik
+  scrutiny:
+    image: example.com/analogj/scrutiny:master-omnibus
+    container_name: scrutiny
+    restart: unless-stopped
+    cap_add:
+    - SYS_RAWIO
+    - SYS_ADMIN
+    volumes:
+    - /docker/appdata/scrutiny/config:/opt/scrutiny/config
+    - /docker/appdata/scrutiny/influxdb:/opt/scrutiny/influxdb
+    - /dev:/dev:ro
+    - /run/udev:/run/udev:ro
+    devices:
+    - /dev/nvme1
+    - /dev/nvme0
+    environment:
+      SCRUTINY_WEB_LISTEN_PORT: ${SCRUTINY_WEB_LISTEN_PORT}
+      SCRUTINY_WEB_LISTEN_HOST: ${SCRUTINY_WEB_LISTEN_HOST}
+    labels:
+    - traefik.enable=true
+    - traefik.docker.network=traefik
+    - traefik.http.routers.scrutiny.rule=Host(`example.com`)
+    - traefik.http.routers.scrutiny.entrypoints=websecure
+    - traefik.http.routers.scrutiny.tls.certresolver=letsencrypt
+    - traefik.http.services.scrutiny.loadbalancer.server.port=8080
+    - traefik.http.routers.scrutiny.middlewares=chain-authentik@file
+    - homepage.group=Infrastructure
+    - homepage.name=Scrutiny
+    - homepage.icon=scrutiny
+    - homepage.href=https://example.com
+    env_file:
+    - .env
+    networks:
+    - default
+    - traefik
+  smokeping:
+    image: example.com/linuxserver/smokeping:latest
+    container_name: smokeping
+    hostname: smokeping
+    environment:
+      PUID: ${PUID}
+      PGID: ${PGID}
+      TZ: ${TZ}
+      SHARED_SECRET: ${SHARED_SECRET}
+      CACHE_DIR: ${CACHE_DIR}
+    volumes:
+    - /docker/appdata/smokeping/config:/config
+    - /docker/appdata/smokeping/data:/data
+    restart: unless-stopped
+    labels:
+    - traefik.enable=true
+    - traefik.docker.network=traefik
+    - traefik.http.routers.smoke.rule=Host(`smoke.${DOMAIN}`)
+    - traefik.http.routers.smoke.entrypoints=websecure
+    - traefik.http.routers.smoke.tls.certresolver=letsencrypt
+    - homepage.group=Infrastructure
+    - homepage.name=Smokeping
+    - homepage.icon=smokeping
+    - homepage.href=https://example.com
+    env_file:
+    - .env
+    networks:
+    - default
+    - traefik
+  error-pages:
+    container_name: error-pages
+    environment:
+      TEMPLATE_NAME: ${TEMPLATE_NAME}
+    image: tarampampam/error-pages
+    command: serve --template-name hacker-terminal --show-details
+    env_file:
+    - .env
+  portainer:
+    container_name: portainer
+    image: portainer/portainer-ee:latest
+    volumes:
+    - /docker/appdata/portainer:/data
+    - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+    labels:
+    - traefik.enable=true
+    - traefik.docker.network=traefik
+    - traefik.http.routers.portainer.rule=Host(`portainer.${DOMAIN}`)
+    - traefik.http.routers.portainer.entrypoints=websecure
+    - traefik.http.routers.portainer.tls.certresolver=letsencrypt
+    - traefik.http.services.portainer.loadbalancer.server.port=9000
+    - homepage.group=Infrastructure
+    - homepage.name=Portainer
+    - homepage.icon=portainer
+    - homepage.href=https://example.com
+    networks:
+    - default
+    - traefik
+  ntfy:
+    container_name: ntfy
+    restart: always
+    image: binwiederhier/ntfy
+    command: serve
+    environment:
+      TZ: ${TZ}
+    volumes:
+    - /docker/appdata/ntfy/cache:/var/cache/ntfy
+    - /docker/appdata/ntfy/config:/etc/ntfy
+    labels:
+    - traefik.enable=true
+    - traefik.docker.network=traefik
+    - traefik.http.routers.ntfy.rule=Host(`notify.${DOMAIN}`)
+    - traefik.http.routers.ntfy.entrypoints=websecure
+    - traefik.http.routers.ntfy.tls.certresolver=letsencrypt
+    - traefik.http.routers.ntfy.middlewares=error-pages@file
+    - homepage.group=Infrastructure
+    - homepage.name=Ntfy
+    - homepage.icon=ntfy
+    - homepage.href=https://example.com
+    env_file:
+    - .env
+    networks:
+    - default
+    - traefik
+  dozzle:
+    container_name: dozzle
+    image: amir20/dozzle:latest
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ}
+      DOZZLE_REMOTE_AGENT: ${DOZZLE_REMOTE_AGENT}
+    volumes:
+    - /var/run/docker.sock:/var/run/docker.sock
+    labels:
+    - traefik.enable=true
+    - traefik.docker.network=traefik
+    - traefik.http.routers.dozzle.rule=Host(`logs.${DOMAIN}`)
+    - traefik.http.routers.dozzle.entrypoints=websecure
+    - traefik.http.routers.dozzle.tls.certresolver=letsencrypt
+    - traefik.http.routers.dozzle.middlewares=chain-authentik@file
+    - homepage.group=Infrastructure
+    - homepage.name=Dozzle
+    - homepage.icon=dozzle
+    - homepage.href=https://example.com
+    env_file:
+    - .env
+    networks:
+    - default
+    - traefik
+  openwebui:
+    container_name: openwebui
+    image: example.com/open-webui/open-webui:main
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      TZ: Pacific/Auckland
+      WEBUI_SECRET_KEY: sWwLRwLMJqiJ610WGQY28O2sEFe1eVPHbfTJg59u5KIU4qHuWpluzwakeWusRP2wWQnal2VsqH6npFMyu747JfdwF8t7OnpNGytTDaxIkwj6QgCtnPwwR5xLZ1TCS6DD
+      ENABLE_OAUTH_SIGNUP: 'true'
+      OAUTH_MERGE_ACCOUNTS_BY_EMAIL: 'true'
+      OIDC_CLIENT_ID: fDCNcSZVpqUMk2d7GHI6hNN7BWQDiG8pLrXb2Qsc
+      OIDC_CLIENT_SECRET: sWwLRwLMJqiJ610WGQY28O2sEFe1eVPHbfTJg59u5KIU4qHuWpluzwakeWusRP2wWQnal2VsqH6npFMyu747JfdwF8t7OnpNGytTDaxIkwj6QgCtnPwwR5xLZ1TCS6DD
+      OIDC_PROVIDER_NAME: Authentik
+      OIDC_PROVIDER_URL: https://example.com/application/o/openwebui/.well-known/openid-configuration
+      OIDC_REDIRECT_URI: https://example.com/oauth/oidc/callback
+      OIDC_SCOPES: openid email profile groups
+      OIDC_ROLES_CLAIM: groups
+      OIDC_ADMIN_ROLES: authentikAdmins
+    volumes:
+    - /docker/appdata/open-webui:/app/backend/data
+    - /dev/dri:/dev/dri
+    labels:
+  
+    - homepage.group=Infrastructure
+    - homepage.name=OpenWebUI
+    - homepage.icon=openai
+    - homepage.href=https://example.com
+    
+  firefly-importer:
+    image: fireflyiii/data-importer:latest
+    container_name: firefly-importer
+    restart: unless-stopped
+    depends_on:
+      firefly:
+        condition: service_started
+    environment:
+      TZ: ${TZ}
+      FIREFLY_III_URL: https://firefly.${DOMAIN}
+      TRUSTED_PROXIES: '**'
+      LOG_CHANNEL: stack
+      APP_KEY: base64:MAaxBAckyXtKoPvv05y/9pShxWBL4gBgxK5ZKtERz+o=
+    labels:
+    - traefik.enable=true
+    - traefik.docker.network=traefik
+    - traefik.http.routers.firefly-importer.rule=Host(`fireflyimporter.${DOMAIN}`)
+    - traefik.http.routers.firefly-importer.entrypoints=websecure
+    - traefik.http.routers.firefly-importer.tls.certresolver=letsencrypt
+    - traefik.http.services.firefly-importer.loadbalancer.server.port=8080
+    - homepage.group=Finance
+    - homepage.name=Firefly Importer
+    - homepage.icon=upload
+    - homepage.href=https://importer.firefly.${DOMAIN}
+    - homepage.description=Firefly III data import tool
+    networks:
+    - default
+    - traefik
+  firefly:
+    image: fireflyiii/core:latest
+    container_name: firefly
+    restart: unless-stopped
+    depends_on:
+      firefly-db:
+        condition: service_healthy
+    environment:
+      TZ: ${TZ}
+      APP_ENV: production
+      APP_KEY: base64:OwpQG3Ul+npAw05Q5VnWT4A0MRmGr1Fq9hmdLd5VbV8=
+      SITE_OWNER: you@example.com
+      APP_URL: https://firefly.${DOMAIN}
+      DB_CONNECTION: mysql
+      DB_HOST: firefly-db
+      DB_PORT: 3306
+      DB_DATABASE: firefly
+      DB_USERNAME: firefly
+      DB_PASSWORD: r9VQm7PZ2cLwF8AEJ6sB4TN5KxYH0uC
+      TRUSTED_PROXIES: '**'
+      LOG_CHANNEL: stack
+    volumes:
+    - /docker/appdata/firefly/upload:/var/www/html/storage/upload
+    labels:
+    - traefik.enable=true
+    - traefik.docker.network=traefik
+    - traefik.http.routers.firefly.rule=Host(`firefly.${DOMAIN}`)
+    - traefik.http.routers.firefly.entrypoints=websecure
+    - traefik.http.routers.firefly.tls.certresolver=letsencrypt
+    - traefik.http.services.firefly.loadbalancer.server.port=8080
+    - homepage.group=Finance
+    - homepage.name=Firefly III
+    - homepage.icon=firefly
+    - homepage.href=https://firefly.${DOMAIN}
+    - homepage.description=Personal finance manager
+    networks:
+    - default
+    - traefik
+  firefly-db:
+    image: example.com/linuxserver/mariadb:11.4.5
+    container_name: firefly-db
+    restart: unless-stopped
+    environment:
+      PUID: ${PUID}
+      PGID: ${PGID}
+      TZ: ${TZ}
+      MYSQL_ROOT_PASSWORD: r9VQm7PZ2cLwF8AEJ6sB4TN5KxYH0uC
+      MYSQL_DATABASE: firefly
+      MYSQL_USER: firefly
+      MYSQL_PASSWORD: r9VQm7PZ2cLwF8AEJ6sB4TN5KxYH0uC
+    volumes:
+    - /docker/appdata/firefly/db:/config
+    healthcheck:
+      test:
+      - CMD
+      - mariadb-admin
+      - ping
+      - -h
+      - localhost
+      interval: 5s
+      timeout: 5s
+      retries: 10
+  duplicati:
+    image: example.com/linuxserver/duplicati:latest
+    container_name: duplicati
+    environment:
+      PUID: ${PUID}
+      PGID: ${PGID}
+      TZ: ${TZ}
+      SETTINGS_ENCRYPTION_KEY: ${SETTINGS_ENCRYPTION_KEY}
+      DUPLICATI__WEBSERVICE_PASSWORD: ${DUPLICATI__WEBSERVICE_PASSWORD}
+    volumes:
+    - /docker/appdata/duplicati/config:/config
+    - /:/source
+    restart: unless-stopped
+    labels:
+    - traefik.enable=true
+    - traefik.docker.network=traefik
+    - traefik.http.routers.dup.rule=Host(`backup.${DOMAIN}`)
+    - traefik.http.routers.dup.entrypoints=websecure
+    - traefik.http.routers.dup.tls.certresolver=letsencrypt
+    - traefik.http.routers.dup.middlewares=chain-authentik@file
+    - homepage.group=Infrastructure
+    - homepage.name=Duplicati
+    - homepage.icon=duplicati
+    - homepage.href=https://example.com
+    env_file:
+    - .env
+    networks:
+    - default
+    - traefik
+  wallos:
+    image: bellamy/wallos:latest
+    container_name: wallos
+    restart: unless-stopped
+    environment:
+      PUID: ${PUID}
+      PGID: ${PGID}
+      TZ: ${TZ}
+    volumes:
+    - /docker/appdata/wallos/config:/config
+    - /docker/appdata/wallos/db:/var/www/html/db
+    - /docker/appdata/wallos/logos:/var/www/html/images/uploads/logos
+    labels:
+    - traefik.enable=true
+    - traefik.docker.network=traefik
+    - traefik.http.routers.wallos.rule=Host(`wallos.${DOMAIN}`)
+    - traefik.http.routers.wallos.entrypoints=websecure
+    - traefik.http.routers.wallos.tls.certresolver=letsencrypt
+    - traefik.http.services.wallos.loadbalancer.server.port=80
+    - homepage.group=Finance
+    - homepage.name=Wallos
+    - homepage.icon=wallet
+    - homepage.href=https://wallos.${DOMAIN}
+    - homepage.description=Subscription & expense tracking
+    networks:
+    - default
+    - traefik
+  code-server:
+    image: example.com/linuxserver/code-server:latest
+    container_name: code-server
+    environment:
+      PUID: ${PUID}
+      PGID: ${PGID}
+      TZ: ${TZ}
+      PROXY_DOMAIN: ${PROXY_DOMAIN}
+      DEFAULT_WORKSPACE: ${DEFAULT_WORKSPACE}
+    volumes:
+    - /docker/appdata/code/config:/config
+    restart: unless-stopped
+    labels:
+    - traefik.enable=true
+    - traefik.docker.network=traefik
+    - traefik.http.routers.code.rule=Host(`code.${DOMAIN}`)
+    - traefik.http.routers.code.entrypoints=websecure
+    - traefik.http.routers.code.tls.certresolver=letsencrypt
+    - traefik.http.routers.code.middlewares=chain-authentik@file
+    - homepage.group=Infrastructure
+    - homepage.name=Code Server
+    - homepage.icon=code-server
+    - homepage.href=https://example.com
+    env_file:
+    - .env
+    networks:
+    - default
+    - traefik
+  beszel:
+    image: henrygd/beszel:latest
+    container_name: beszel
+    restart: unless-stopped
+    volumes:
+    - /docker/appdata/bezel/beszel_data:/beszel_data
+    - /docker/appdata/bezel/beszel_socket:/beszel_socket
+    labels:
+    - traefik.enable=true
+    - traefik.docker.network=traefik
+    - traefik.http.routers.beszel.rule=Host(`beszel.${DOMAIN}`)
+    - traefik.http.routers.beszel.entrypoints=websecure
+    - traefik.http.routers.beszel.tls.certresolver=letsencrypt
+    - traefik.http.routers.beszel.middlewares=chain-authentik@file
+    - homepage.group=Infrastructure
+    - homepage.name=Beszel
+    - homepage.icon=beszel
+    - homepage.href=https://example.com
+    networks:
+    - default
+    - traefik
+  beszel-agent:
+    image: henrygd/beszel-agent
+    container_name: beszel-agent
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+    - /var/run/docker.sock:/var/run/docker.sock:ro
+    - ./beszel_agent_data:/var/lib/beszel-agent
+    environment:
+      LISTEN: 45876
+      KEY: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICBSsBlfffUo/G61hjvD+SNaO4JoH/d71b3br6+lSA4C
+      TOKEN: 8dd3b4a2-b351-4f74-954d-bf0c3fed59fb
+      HUB_URL: ${HUB_URL}
+    env_file:
+    - .env
+   
+networks:
+  
+  traefik:
+    external: true
+  default:
+    internal: true

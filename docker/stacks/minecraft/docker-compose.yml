@@ -1,0 +1,33 @@
+services:
+  minecraft:
+    image: itzg/minecraft-server:latest
+    container_name: minecraft-server
+    network_mode: host
+    environment:
+      EULA: ${EULA}
+      RCON_PASSWORD: ${RCON_PASSWORD}
+      ENABLE_RCON: ${ENABLE_RCON}
+      MEMORY: ${MEMORY}
+      ONLINE_MODE: ${ONLINE_MODE}
+      USE_AIKAR_FLAGS: ${USE_AIKAR_FLAGS}
+      USE_MEOWICE_FLAGS: ${USE_MEOWICE_FLAGS}
+      TZ: ${TZ}
+      DIFFICULTY: ${DIFFICULTY}
+      SIMULATION_DISTANCE: ${SIMULATION_DISTANCE}
+      VIEW_DISTANCE: ${VIEW_DISTANCE}
+      ENABLE_ROLLING_LOGS: ${ENABLE_ROLLING_LOGS}
+    volumes:
+    - /docker/appdata/minecraft/minecraft-vanilla/data:/data
+    restart: unless-stopped
+    ports:
+    - 25565:25565
+    env_file:
+    - .env
+    
+    
+networks:
+  default:
+    
+    internal: true
+  traefik:
+    external: true
